@@ -149,8 +149,8 @@ npm list --depth=0
 
 ### Step 4: Backend Setup (Python)
 ```bash
-# Create a Python virtual environment (highly recommended)
-python -m venv venv
+# Create a Python virtual environment (required for dependency isolation)
+python3 -m venv venv
 
 # Activate the virtual environment
 # On macOS/Linux:
@@ -167,6 +167,9 @@ pip install -r requirements.txt
 
 # Verify key packages are installed
 pip list | grep -E "(faiss|sentence-transformers|langchain)"
+
+# Alternative: Use the provided activation script
+# source activate_env.sh
 ```
 
 ### Step 5: AI Model Setup
@@ -222,6 +225,9 @@ ls -la embeddings/
 source venv/bin/activate  # On macOS/Linux
 # venv\Scripts\activate   # On Windows
 
+# Or use the provided activation script
+source activate_env.sh
+
 # Start the Next.js development server
 npm run dev
 
@@ -272,7 +278,13 @@ npm start
 # Lint the code
 npm run lint
 
-# Run Python scripts directly
+# Run Python scripts directly (make sure virtual environment is activated)
+source venv/bin/activate
+python scripts/ingest_textbooks.py
+python scripts/answer_question.py "Your question here"
+
+# Or use the activation script
+source activate_env.sh
 python scripts/ingest_textbooks.py
 python scripts/answer_question.py "Your question here"
 ```
@@ -292,7 +304,13 @@ npm run dev -- -p 3001
 ```bash
 # Recreate virtual environment
 rm -rf venv
-python -m venv venv
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# If you get "externally-managed-environment" error:
+# This means you need to use a virtual environment
+python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 ```
@@ -343,6 +361,7 @@ pip install -r requirements.txt --upgrade
 - [ ] Development server started (`npm run dev`)
 - [ ] Application accessible at `http://localhost:3000`
 - [ ] Upload and question-answering tested
+- [ ] Virtual environment activation script working (`source activate_env.sh`)
 
 **🎉 You're all set!** Your local AI Document Q&A system is ready to use.
 
@@ -390,7 +409,7 @@ pip install -r requirements.txt --upgrade
 ## 🏗️ Project Structure
 
 ```
-gen_ai_ui/
+AI-document-analysis/
 ├── app/
 │   ├── api/                    # Next.js API routes
 │   │   ├── ask-question/       # Q&A endpoint
@@ -411,6 +430,7 @@ gen_ai_ui/
 ├── embeddings/
 │   └── faiss_index/           # Generated embeddings
 ├── venv/                      # Python virtual environment
+├── activate_env.sh            # Virtual environment activation script
 ├── requirements.txt           # Python dependencies
 ├── package.json               # Node.js dependencies
 └── README.md                  # This file
@@ -473,6 +493,32 @@ Remove all documents and embeddings.
 - **Limit document size** for better processing speed
 - **Clear old documents** periodically to free up space
 - Ensure **Ollama service** is running before starting the app
+
+### Virtual Environment Management
+The project uses a Python virtual environment to isolate dependencies. This is required to avoid conflicts with system Python packages.
+
+#### Quick Activation
+```bash
+# Use the provided activation script
+source activate_env.sh
+
+# Or activate manually
+source venv/bin/activate
+```
+
+#### Common Virtual Environment Issues
+- **"externally-managed-environment" error**: This means you need to use a virtual environment
+- **"No module named" errors**: Make sure the virtual environment is activated before running scripts
+- **Permission errors**: Use `python3` instead of `python` on macOS
+
+#### Verifying Virtual Environment
+```bash
+# Check if virtual environment is active (should show (venv) in prompt)
+which python
+
+# Should show path to venv/bin/python
+# If not, activate the virtual environment first
+```
 
 ## 🤝 Contributing
 
