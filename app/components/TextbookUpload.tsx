@@ -1,8 +1,15 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
-import { Upload, File, X, CheckCircle, AlertCircle } from "lucide-react";
+import {
+  Upload,
+  File,
+  X,
+  CheckCircle,
+  AlertCircle,
+  Loader2,
+} from "lucide-react";
 import toast from "react-hot-toast";
 
 interface UploadedFile {
@@ -15,6 +22,29 @@ interface UploadedFile {
 export default function TextbookUpload() {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingTime, setProcessingTime] = useState(0);
+
+  // Timer effect for processing
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isProcessing) {
+      interval = setInterval(() => {
+        setProcessingTime((prev) => prev + 1);
+      }, 1000);
+    } else {
+      setProcessingTime(0);
+    }
+    return () => clearInterval(interval);
+  }, [isProcessing]);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs
+      .toString()
+      .padStart(2, "0")}`;
+  };
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     setIsUploading(true);
@@ -95,6 +125,9 @@ export default function TextbookUpload() {
       return;
     }
 
+    setIsProcessing(true);
+    setProcessingTime(0);
+
     try {
       const response = await fetch("/api/ingest-textbooks", {
         method: "POST",
@@ -102,115 +135,135 @@ export default function TextbookUpload() {
 
       if (response.ok) {
         toast.success("Document processing started successfully!");
+        // Keep processing state active for a few seconds to show the timer
+        setTimeout(() => {
+          setIsProcessing(false);
+        }, 3000);
       } else {
         toast.error("Failed to start processing");
+        setIsProcessing(false);
       }
     } catch (error) {
       toast.error("Error starting document processing");
+      setIsProcessing(false);
     }
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="mb-6">
+        <h2 className="text-2xl font-extrabold text-white tracking-tight bg-gradient-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent mb-2">
           Upload Documents
         </h2>
-        <p className="text-gray-600 mb-6">
+        <p className="text-gray-300 font-medium">
           Upload PDF, DOC, DOCX, or TXT files to create a searchable knowledge
           base for AI-powered question answering.
         </p>
+      </div>
 
-        {/* Dropzone */}
-        <div
-          {...getRootProps()}
-          className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-            isDragActive
-              ? "border-primary-500 bg-primary-50"
-              : "border-gray-300 hover:border-gray-400"
-          }`}
-        >
-          <input {...getInputProps()} />
-          <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          {isDragActive ? (
-            <p className="text-primary-600 text-lg">Drop the files here...</p>
-          ) : (
-            <div>
-              <p className="text-gray-600 text-lg mb-2">
-                Drag & drop document files here, or click to select
-              </p>
-              <p className="text-gray-500 text-sm">
-                Supports PDF, DOC, DOCX, and TXT files
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* File List */}
-        {uploadedFiles.length > 0 && (
-          <div className="mt-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">
-              Uploaded Files
-            </h3>
-            <div className="space-y-3">
-              {uploadedFiles.map((file, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                >
-                  <div className="flex items-center space-x-3">
-                    <File className="w-5 h-5 text-gray-400" />
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">
-                        {file.name}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {formatFileSize(file.size)}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    {file.status === "uploading" && (
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-500" />
-                    )}
-                    {file.status === "success" && (
-                      <CheckCircle className="w-5 h-5 text-green-500" />
-                    )}
-                    {file.status === "error" && (
-                      <AlertCircle className="w-5 h-5 text-red-500" />
-                    )}
-                    <button
-                      onClick={() => removeFile(file.name)}
-                      className="text-gray-400 hover:text-red-500"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Process Button */}
-        {uploadedFiles.some((f) => f.status === "success") && (
-          <div className="mt-6 pt-4 border-t border-gray-200">
-            <button
-              onClick={triggerIngestion}
-              disabled={isUploading}
-              className="w-full bg-primary-600 text-white py-2 px-4 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {isUploading
-                ? "Processing..."
-                : "Process Documents for AI Questions"}
-            </button>
-            <p className="text-sm text-gray-500 mt-2">
-              This will create embeddings from the uploaded documents to enable
-              AI-powered question answering.
+      {/* Dropzone */}
+      <div
+        {...getRootProps()}
+        className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all duration-300 mb-6 backdrop-blur-md ${
+          isDragActive
+            ? "border-gray-400/70 bg-gray-500/10 shadow-lg"
+            : "border-gray-600/50 hover:border-gray-500/70 bg-black/20 hover:bg-black/30"
+        }`}
+      >
+        <input {...getInputProps()} />
+        <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+        {isDragActive ? (
+          <p className="text-gray-300 text-lg">Drop the files here...</p>
+        ) : (
+          <div>
+            <p className="text-gray-300 text-lg mb-2">
+              Drag & drop document files here, or click to select
+            </p>
+            <p className="text-gray-400 text-sm">
+              Supports PDF, DOC, DOCX, and TXT files
             </p>
           </div>
         )}
       </div>
+
+      {/* File List */}
+      {uploadedFiles.length > 0 && (
+        <div className="flex-1 overflow-y-auto">
+          <h3 className="text-lg font-medium text-white mb-4">
+            Uploaded Files
+          </h3>
+          <div className="space-y-3">
+            {uploadedFiles.map((file, index) => (
+              <div
+                key={index}
+                className="flex items-center justify-between p-3 bg-gray-800/60 backdrop-blur-md rounded-lg border border-gray-700/50"
+              >
+                <div className="flex items-center space-x-3">
+                  <File className="w-5 h-5 text-gray-400" />
+                  <div>
+                    <p className="text-sm font-medium text-white">
+                      {file.name}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {formatFileSize(file.size)}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  {file.status === "uploading" && (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400"></div>
+                  )}
+                  {file.status === "success" && (
+                    <CheckCircle className="w-5 h-5 text-green-500" />
+                  )}
+                  {file.status === "error" && (
+                    <AlertCircle className="w-5 h-5 text-red-500" />
+                  )}
+                  <button
+                    onClick={() => removeFile(file.name)}
+                    className="text-gray-400 hover:text-red-500 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Process Button */}
+      {uploadedFiles.some((f) => f.status === "success") && (
+        <div className="mt-6 pt-4 border-t border-gray-700/50">
+          <button
+            onClick={triggerIngestion}
+            disabled={isUploading || isProcessing}
+            className="w-full bg-gray-700/80 text-white py-2 px-4 rounded-lg hover:bg-gray-600/80 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 border border-gray-600/50 flex items-center justify-center space-x-2 backdrop-blur-md"
+          >
+            {isProcessing ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span>Processing Documents...</span>
+                <span className="text-sm opacity-75">
+                  ({formatTime(processingTime)})
+                </span>
+              </>
+            ) : isUploading ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span>Uploading...</span>
+              </>
+            ) : (
+              "Process Documents for AI Questions"
+            )}
+          </button>
+          <p className="text-sm text-gray-400 mt-2">
+            This will create embeddings from the uploaded documents to enable
+            AI-powered question answering.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
